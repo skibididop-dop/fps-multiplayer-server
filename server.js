@@ -1,87 +1,123 @@
+// ===============================
+// FPS MULTIPLAYER SERVER (FINAL)
+// ===============================
+
 const WebSocket = require("ws");
+const crypto = require("crypto");
 
-const wss = new WebSocket.Server({ port: 8080 });
-console.log("✅ FPS server running on ws://localhost:8080");
+// -------------------------------
+// CONFIG
+// -------------------------------
+const PORT = process.env.PORT || 8080;
 
+// -------------------------------
+// SERVER
+// -------------------------------
+const wss = new WebSocket.Server({
+  port: PORT,
+  host: "0.0.0.0"
+});
+
+console.log(`✅ FPS server running on ws://0.0.0.0:${PORT}`);
+
+// -------------------------------
+// GAME STATE
+// -------------------------------
 const players = {};
-const flags = {
-  RED: { x: -40, y: 1, z: 0, holder: null },
-  BLUE: { x: 40, y: 1, z: 0, holder: null }
-};
 
-let nextId = 1;
+// -------------------------------
+// HELPERS
+// -------------------------------
+function uid() {
+  return crypto.randomUUID();
+}
 
 function broadcast(data) {
   const msg = JSON.stringify(data);
-  wss.clients.forEach(c => {
-    if (c.readyState === 1) c.send(msg);
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
   });
 }
 
+// -------------------------------
+// CONNECTION
+// -------------------------------
 wss.on("connection", ws => {
-  const id = String(nextId++);
+  const id = uid();
+  ws.id = id;
+
+  console.log("🟢 Player connected:", id);
+
+  // Create EMPTY player (no team yet)
   players[id] = {
-    id,
-    x: 0, y: 0, z: 0,
+    x: 0,
+    y: 0,
+    z: 0,
     rot: 0,
-    team: null,
     health: 100,
-    score: 0
+    score: 0,
+    team: null
   };
 
-  ws.send(JSON.stringify({ type: "init", id }));
+  // Send init packet
+  ws.send(JSON.stringify({
+    type: "init",
+    id
+  }));
 
-  ws.on("message", msg => {
-    const data = JSON.parse(msg);
-
-    if (data.type === "join") {
-      players[id].team = data.team;
+  // ---------------------------
+  // MESSAGE HANDLER
+  // ---------------------------
+  ws.on("message", data => {
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch {
       return;
     }
 
-    if (data.type === "move") {
-      Object.assign(players[id], data.player);
-      return;
+    const p = players[id];
+    if (!p) return;
+
+    // -------- JOIN TEAM --------
+    if (msg.type === "join") {
+      if (msg.team !== "RED" && msg.team !== "BLUE") return;
+
+      p.team = msg.team;
+      p.health = 100;
+
+      console.log(`🔵 ${id} joined ${msg.team}`);
     }
 
-    if (data.type === "shoot") {
-      handleShoot(id, data);
+    // -------- MOVE --------
+    if (msg.type === "move") {
+      if (!p.team) return; // ignore until team selected
+
+      p.x = msg.player.x;
+      p.y = msg.player.y;
+      p.z = msg.player.z;
+      p.rot = msg.player.rot;
     }
   });
 
+  // ---------------------------
+  // DISCONNECT
+  // ---------------------------
   ws.on("close", () => {
+    console.log("🔴 Player disconnected:", id);
     delete players[id];
   });
 });
 
-function handleShoot(shooterId, data) {
-  const shooter = players[shooterId];
-  if (!shooter) return;
-
-  for (const id in players) {
-    const p = players[id];
-    if (p.team === shooter.team || p.health <= 0) continue;
-
-    const dx = p.x - shooter.x;
-    const dz = p.z - shooter.z;
-    const dist = Math.sqrt(dx*dx + dz*dz);
-
-    if (dist < 5) {
-      p.health -= 25;
-      if (p.health <= 0) {
-        shooter.score += 1;
-        p.health = 100;
-        p.x = p.team === "RED" ? -40 : 40;
-        p.z = 0;
-      }
-    }
-  }
-}
-
+// -------------------------------
+// GAME LOOP (STATE BROADCAST)
+// -------------------------------
 setInterval(() => {
   broadcast({
     type: "state",
-    players,
-    flags
+    players
   });
-}, 50);
+}, 50); // 20 updates/sec
+
