@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const PORT = process.env.PORT || 8080;
 const RESPAWN_TIME = 3000;
 const DAMAGE = 25;
+const SHOOT_RANGE = 50; // Maximum shooting range
+const SHOOT_ANGLE = 0.3; // Aiming tolerance (radians)
 
 const wss = new WebSocket.Server({
   port: PORT,
@@ -23,6 +25,13 @@ function broadcast(data) {
   wss.clients.forEach(c => {
     if (c.readyState === WebSocket.OPEN) c.send(msg);
   });
+}
+
+// Normalize angle to -PI to PI range
+function normalizeAngle(angle) {
+  while (angle > Math.PI) angle -= 2 * Math.PI;
+  while (angle < -Math.PI) angle += 2 * Math.PI;
+  return angle;
 }
 
 wss.on("connection", ws => {
@@ -50,6 +59,10 @@ wss.on("connection", ws => {
       p.team = msg.team;
       p.health = 100;
       p.alive = true;
+      // Set spawn position
+      p.x = msg.team === "RED" ? -40 : 40;
+      p.z = 0;
+      p.y = 0;
     }
 
     // MOVE
@@ -62,33 +75,71 @@ wss.on("connection", ws => {
 
     // SHOOT
     if (msg.type === "shoot" && p.alive) {
+      let hitSomeone = false;
+      
       for (const tid in players) {
         const t = players[tid];
-        if (!t.alive || t.team === p.team) continue;
+        if (tid === id || !t.alive || t.team === p.team) continue;
 
+        // Calculate distance
         const dx = t.x - p.x;
         const dz = t.z - p.z;
-        const dist = Math.sqrt(dx*dx + dz*dz);
-        if (dist > 10) continue;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        
+        if (dist > SHOOT_RANGE) continue;
 
-        const angle = Math.atan2(dx, dz);
-        const diff = Math.abs(angle - p.rot);
-        if (diff < 0.4) {
+        // Calculate angle to target
+        const angleToTarget = Math.atan2(dx, dz);
+        
+        // Normalize both angles
+        const shooterAngle = normalizeAngle(p.rot);
+        const targetAngle = normalizeAngle(angleToTarget);
+        
+        // Calculate angle difference
+        let angleDiff = Math.abs(targetAngle - shooterAngle);
+        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+        
+        // Check if target is within aiming cone
+        if (angleDiff < SHOOT_ANGLE) {
           t.health -= DAMAGE;
+          hitSomeone = true;
+
+          // Broadcast hit event for visual feedback
+          broadcast({
+            type: "hit",
+            shooter: id,
+            target: tid,
+            damage: DAMAGE
+          });
 
           if (t.health <= 0) {
             t.alive = false;
             t.health = 0;
+
+            // Broadcast kill event
+            broadcast({
+              type: "kill",
+              killer: id,
+              victim: tid
+            });
 
             setTimeout(() => {
               t.health = 100;
               t.alive = true;
               t.x = t.team === "RED" ? -40 : 40;
               t.z = 0;
+              t.y = 0;
             }, RESPAWN_TIME);
           }
         }
       }
+      
+      // Send shoot event even if no hit (for visual effects)
+      broadcast({
+        type: "shoot",
+        shooter: id,
+        hit: hitSomeone
+      });
     }
   });
 
