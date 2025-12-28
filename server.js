@@ -76,6 +76,7 @@ wss.on("connection", ws => {
     // SHOOT
     if (msg.type === "shoot" && p.alive) {
       let hitSomeone = false;
+      console.log(`Player ${id} shooting from (${p.x.toFixed(2)}, ${p.z.toFixed(2)}) at angle ${p.rot.toFixed(2)}`);
       
       for (const tid in players) {
         const t = players[tid];
@@ -86,7 +87,10 @@ wss.on("connection", ws => {
         const dz = t.z - p.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         
-        if (dist > SHOOT_RANGE) continue;
+        if (dist > SHOOT_RANGE) {
+          console.log(`Target ${tid} too far: ${dist.toFixed(2)} > ${SHOOT_RANGE}`);
+          continue;
+        }
 
         // Calculate angle to target
         const angleToTarget = Math.atan2(dx, dz);
@@ -99,10 +103,13 @@ wss.on("connection", ws => {
         let angleDiff = Math.abs(targetAngle - shooterAngle);
         if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
         
+        console.log(`Target ${tid}: dist=${dist.toFixed(2)}, angleDiff=${angleDiff.toFixed(3)}, threshold=${SHOOT_ANGLE}`);
+        
         // Check if target is within aiming cone
         if (angleDiff < SHOOT_ANGLE) {
           t.health -= DAMAGE;
           hitSomeone = true;
+          console.log(`✅ HIT! Target ${tid} health: ${t.health}`);
 
           // Broadcast hit event for visual feedback
           broadcast({
@@ -115,6 +122,7 @@ wss.on("connection", ws => {
           if (t.health <= 0) {
             t.alive = false;
             t.health = 0;
+            console.log(`💀 Player ${tid} eliminated by ${id}`);
 
             // Broadcast kill event
             broadcast({
@@ -129,6 +137,7 @@ wss.on("connection", ws => {
               t.x = t.team === "RED" ? -40 : 40;
               t.z = 0;
               t.y = 0;
+              console.log(`Player ${tid} respawned`);
             }, RESPAWN_TIME);
           }
         }
