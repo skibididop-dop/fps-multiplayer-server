@@ -1,0 +1,167 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: black;
+  font-family: 'Arial', sans-serif;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: block;
+}
+
+#teamMenu {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+}
+
+#teamMenu h1 {
+  color: white;
+  font-size: 48px;
+  text-shadow: 3px 3px 6px black;
+  margin-bottom: 20px;
+}
+
+.button-container {
+  display: flex;
+  gap: 40px;
+}
+
+#teamMenu button {
+  font-size: 28px;
+  font-weight: bold;
+  padding: 25px 60px;
+  cursor: pointer;
+  border: 4px solid white;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-radius: 10px;
+}
+
+#teamMenu button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+#redBtn {
+  border-color: #ff4444;
+  background: rgba(255, 68, 68, 0.2);
+}
+
+#redBtn:hover {
+  background: rgba(255, 68, 68, 0.4);
+  box-shadow: 0 0 30px rgba(255, 68, 68, 0.8);
+}
+
+#blueBtn {
+  border-color: #4444ff;
+  background: rgba(68, 68, 255, 0.2);
+}
+
+#blueBtn:hover {
+  background: rgba(68, 68, 255, 0.4);
+  box-shadow: 0 0 30px rgba(68, 68, 255, 0.8);
+}
+
+#hud {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 5;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  pointer-events: none;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+#health {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+#hp {
+  color: #4ade80;
+}
+
+#status {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid white;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  display: none;
+  transition: all 0.1s ease;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+#crosshair::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 100%;
+  background: white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+#crosshair::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 2px;
+  background: white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  #teamMenu h1 {
+    font-size: 32px;
+  }
+  
+  #teamMenu button {
+    font-size: 20px;
+    padding: 15px 40px;
+  }
+  
+  .button-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+}
