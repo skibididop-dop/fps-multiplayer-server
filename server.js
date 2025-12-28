@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 8080;
 const RESPAWN_TIME = 3000;
 const DAMAGE = 25;
 const SHOOT_RANGE = 50; // Maximum shooting range
-const SHOOT_ANGLE = 0.3; // Aiming tolerance (radians)
+const SHOOT_ANGLE = 0.5; // Aiming tolerance (radians) - increased for easier hits
 
 const wss = new WebSocket.Server({
   port: PORT,
@@ -71,24 +71,33 @@ wss.on("connection", ws => {
       p.y = msg.player.y;
       p.z = msg.player.z;
       p.rot = msg.player.rot;
+      
+      // Also update camera rotation if provided
+      if (msg.player.camRot !== undefined) {
+        p.camRot = msg.player.camRot;
+      }
     }
 
     // SHOOT
     if (msg.type === "shoot" && p.alive) {
       let hitSomeone = false;
-      console.log(`Player ${id} shooting from (${p.x.toFixed(2)}, ${p.z.toFixed(2)}) at angle ${p.rot.toFixed(2)}`);
+      let hitTargets = [];
+      
+      console.log(`\n🔫 Player ${id} (${p.team}) shooting from (${p.x.toFixed(2)}, ${p.z.toFixed(2)}) at angle ${p.rot.toFixed(2)}`);
       
       for (const tid in players) {
         const t = players[tid];
-        if (tid === id || !t.alive || t.team === p.team) continue;
+        if (tid === id || !t.alive || !t.team || t.team === p.team) continue;
 
         // Calculate distance
         const dx = t.x - p.x;
         const dz = t.z - p.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         
+        console.log(`  Checking target ${tid} (${t.team}): pos=(${t.x.toFixed(2)}, ${t.z.toFixed(2)}), dist=${dist.toFixed(2)}`);
+        
         if (dist > SHOOT_RANGE) {
-          console.log(`Target ${tid} too far: ${dist.toFixed(2)} > ${SHOOT_RANGE}`);
+          console.log(`    ❌ Too far: ${dist.toFixed(2)} > ${SHOOT_RANGE}`);
           continue;
         }
 
@@ -103,13 +112,14 @@ wss.on("connection", ws => {
         let angleDiff = Math.abs(targetAngle - shooterAngle);
         if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
         
-        console.log(`Target ${tid}: dist=${dist.toFixed(2)}, angleDiff=${angleDiff.toFixed(3)}, threshold=${SHOOT_ANGLE}`);
+        console.log(`    Angles: shooter=${shooterAngle.toFixed(3)}, target=${targetAngle.toFixed(3)}, diff=${angleDiff.toFixed(3)} (threshold=${SHOOT_ANGLE})`);
         
         // Check if target is within aiming cone
         if (angleDiff < SHOOT_ANGLE) {
           t.health -= DAMAGE;
           hitSomeone = true;
-          console.log(`✅ HIT! Target ${tid} health: ${t.health}`);
+          hitTargets.push(tid);
+          console.log(`    ✅ HIT! Target ${tid} health: ${t.health}/${100}`);
 
           // Broadcast hit event for visual feedback
           broadcast({
@@ -122,7 +132,7 @@ wss.on("connection", ws => {
           if (t.health <= 0) {
             t.alive = false;
             t.health = 0;
-            console.log(`💀 Player ${tid} eliminated by ${id}`);
+            console.log(`    💀 Player ${tid} eliminated by ${id}`);
 
             // Broadcast kill event
             broadcast({
@@ -132,15 +142,25 @@ wss.on("connection", ws => {
             });
 
             setTimeout(() => {
-              t.health = 100;
-              t.alive = true;
-              t.x = t.team === "RED" ? -40 : 40;
-              t.z = 0;
-              t.y = 0;
-              console.log(`Player ${tid} respawned`);
+              if (players[tid]) {
+                t.health = 100;
+                t.alive = true;
+                t.x = t.team === "RED" ? -40 : 40;
+                t.z = 0;
+                t.y = 0;
+                console.log(`    ♻️ Player ${tid} respawned`);
+              }
             }, RESPAWN_TIME);
           }
+        } else {
+          console.log(`    ❌ Angle too large: ${angleDiff.toFixed(3)} >= ${SHOOT_ANGLE}`);
         }
+      }
+      
+      if (hitSomeone) {
+        console.log(`  ✅ Shot hit ${hitTargets.length} target(s): ${hitTargets.join(', ')}`);
+      } else {
+        console.log(`  ❌ Shot missed all targets`);
       }
       
       // Send shoot event even if no hit (for visual effects)
