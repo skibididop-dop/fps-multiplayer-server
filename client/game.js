@@ -13,6 +13,7 @@ const keys = {};
 const remotePlayers = {};
 const bullets = [];
 const particles = [];
+const collidableObjects = []; // For collision detection
 
 /* =======================
    PLAYER
@@ -25,6 +26,7 @@ const SPEED = 6;
 const GRAVITY = 25;
 const HEIGHT = 1.7;
 const JUMP_FORCE = 8;
+const PLAYER_RADIUS = 0.5; // Collision radius
 
 let weaponModel = null;
 let onGround = true;
@@ -143,6 +145,7 @@ function init() {
 
   // Create world
   createWorld();
+  console.log(`✅ Map loaded with ${collidableObjects.length} collidable objects`);
 
   // Setup controls and UI
   setupInput();
@@ -220,6 +223,15 @@ function createWorld() {
   createTrenches(materials.wall);
 }
 
+function addCollidable(mesh, customBox = null) {
+  if (customBox) {
+    collidableObjects.push(customBox);
+  } else {
+    const box = new THREE.Box3().setFromObject(mesh);
+    collidableObjects.push(box);
+  }
+}
+
 function createBoundaryWalls(material) {
   const wallHeight = 5;
   const mapSize = 100;
@@ -232,6 +244,7 @@ function createBoundaryWalls(material) {
   );
   northWall.position.set(0, wallHeight / 2, -mapSize / 2);
   scene.add(northWall);
+  addCollidable(northWall);
 
   // South Wall
   const southWall = new THREE.Mesh(
@@ -240,6 +253,7 @@ function createBoundaryWalls(material) {
   );
   southWall.position.set(0, wallHeight / 2, mapSize / 2);
   scene.add(southWall);
+  addCollidable(southWall);
 
   // East Wall
   const eastWall = new THREE.Mesh(
@@ -248,6 +262,7 @@ function createBoundaryWalls(material) {
   );
   eastWall.position.set(mapSize / 2, wallHeight / 2, 0);
   scene.add(eastWall);
+  addCollidable(eastWall);
 
   // West Wall
   const westWall = new THREE.Mesh(
@@ -256,6 +271,7 @@ function createBoundaryWalls(material) {
   );
   westWall.position.set(-mapSize / 2, wallHeight / 2, 0);
   scene.add(westWall);
+  addCollidable(westWall);
 }
 
 function createRedBase(baseMaterial, wallMaterial) {
@@ -274,6 +290,7 @@ function createRedBase(baseMaterial, wallMaterial) {
   );
   backWall.position.set(-40, 2, -7);
   scene.add(backWall);
+  addCollidable(backWall);
 
   // Side walls
   const leftWall = new THREE.Mesh(
@@ -282,6 +299,7 @@ function createRedBase(baseMaterial, wallMaterial) {
   );
   leftWall.position.set(-47, 2, 0);
   scene.add(leftWall);
+  addCollidable(leftWall);
 
   const rightWall = new THREE.Mesh(
     new THREE.BoxGeometry(2, 4, 7),
@@ -289,6 +307,7 @@ function createRedBase(baseMaterial, wallMaterial) {
   );
   rightWall.position.set(-33, 2, 4);
   scene.add(rightWall);
+  addCollidable(rightWall);
 
   // Cover in front
   const cover = new THREE.Mesh(
@@ -297,6 +316,7 @@ function createRedBase(baseMaterial, wallMaterial) {
   );
   cover.position.set(-30, 1, 0);
   scene.add(cover);
+  addCollidable(cover);
 }
 
 function createBlueBase(baseMaterial, wallMaterial) {
@@ -315,6 +335,7 @@ function createBlueBase(baseMaterial, wallMaterial) {
   );
   backWall.position.set(40, 2, 7);
   scene.add(backWall);
+  addCollidable(backWall);
 
   // Side walls
   const leftWall = new THREE.Mesh(
@@ -323,6 +344,7 @@ function createBlueBase(baseMaterial, wallMaterial) {
   );
   leftWall.position.set(47, 2, 0);
   scene.add(leftWall);
+  addCollidable(leftWall);
 
   const rightWall = new THREE.Mesh(
     new THREE.BoxGeometry(2, 4, 7),
@@ -330,6 +352,7 @@ function createBlueBase(baseMaterial, wallMaterial) {
   );
   rightWall.position.set(33, 2, -4);
   scene.add(rightWall);
+  addCollidable(rightWall);
 
   // Cover in front
   const cover = new THREE.Mesh(
@@ -338,6 +361,7 @@ function createBlueBase(baseMaterial, wallMaterial) {
   );
   cover.position.set(30, 1, 0);
   scene.add(cover);
+  addCollidable(cover);
 }
 
 function createCenterStructure(coverMaterial, platformMaterial) {
@@ -348,6 +372,13 @@ function createCenterStructure(coverMaterial, platformMaterial) {
   );
   tower.position.set(0, 3, 0);
   scene.add(tower);
+  
+  // Add cylindrical collision (approximate as box)
+  const towerBox = new THREE.Box3(
+    new THREE.Vector3(-4, 0, -4),
+    new THREE.Vector3(4, 6, 4)
+  );
+  collidableObjects.push(towerBox);
 
   // Top platform
   const topPlatform = new THREE.Mesh(
@@ -372,6 +403,7 @@ function createCenterStructure(coverMaterial, platformMaterial) {
     );
     wall.position.set(pos[0], pos[1], pos[2]);
     scene.add(wall);
+    addCollidable(wall);
   });
 }
 
@@ -400,6 +432,7 @@ function createCoverPositions(material) {
     cover.castShadow = true;
     cover.receiveShadow = true;
     scene.add(cover);
+    addCollidable(cover);
   });
 }
 
@@ -418,6 +451,13 @@ function createPillars(material) {
     pillar.position.set(pos[0], 2.5, pos[2]);
     pillar.castShadow = true;
     scene.add(pillar);
+    
+    // Add cylindrical collision (approximate as box)
+    const pillarBox = new THREE.Box3(
+      new THREE.Vector3(pos[0] - 1.5, 0, pos[2] - 1.5),
+      new THREE.Vector3(pos[0] + 1.5, 5, pos[2] + 1.5)
+    );
+    collidableObjects.push(pillarBox);
   });
 }
 
@@ -451,6 +491,7 @@ function createPlatforms(material) {
           data[2] + j * (data[4] / 2 - 0.5)
         );
         scene.add(support);
+        addCollidable(support);
       }
     }
   });
@@ -478,6 +519,7 @@ function createCrates(material) {
       crate.castShadow = true;
       crate.receiveShadow = true;
       scene.add(crate);
+      addCollidable(crate);
     });
   });
 }
@@ -514,6 +556,7 @@ function createTrenches(material) {
       trench.z
     );
     scene.add(frontWall);
+    addCollidable(frontWall);
 
     // Back wall (lower for cover)
     const backWall = new THREE.Mesh(
@@ -526,6 +569,7 @@ function createTrenches(material) {
       trench.z
     );
     scene.add(backWall);
+    addCollidable(backWall);
   });
 }
 
@@ -705,13 +749,13 @@ function animateWeaponShoot() {
   const originalZ = weaponModel.position.z;
   const originalX = weaponModel.rotation.x;
 
-  weaponModel.position.z += 0.1;
-  weaponModel.rotation.x -= 0.1;
+  weaponModel.position.z += 0.05; // Reduced from 0.1
+  weaponModel.rotation.x -= 0.05; // Reduced from 0.1
 
   setTimeout(() => {
     weaponModel.position.z = originalZ;
     weaponModel.rotation.x = originalX;
-  }, 100);
+  }, 80);
 }
 
 function flashCrosshair() {
@@ -1134,6 +1178,49 @@ function setupSocket() {
 }
 
 /* =======================
+   COLLISION DETECTION
+======================= */
+function checkCollision(newPosition) {
+  const playerBox = new THREE.Box3(
+    new THREE.Vector3(
+      newPosition.x - PLAYER_RADIUS,
+      newPosition.y,
+      newPosition.z - PLAYER_RADIUS
+    ),
+    new THREE.Vector3(
+      newPosition.x + PLAYER_RADIUS,
+      newPosition.y + HEIGHT,
+      newPosition.z + PLAYER_RADIUS
+    )
+  );
+
+  for (let i = 0; i < collidableObjects.length; i++) {
+    if (playerBox.intersectsBox(collidableObjects[i])) {
+      return true; // Collision detected
+    }
+  }
+
+  return false; // No collision
+}
+
+function resolveCollision(oldPos, newPos) {
+  // Try X axis only
+  const testX = new THREE.Vector3(newPos.x, oldPos.y, oldPos.z);
+  if (!checkCollision(testX)) {
+    return testX;
+  }
+
+  // Try Z axis only
+  const testZ = new THREE.Vector3(oldPos.x, oldPos.y, newPos.z);
+  if (!checkCollision(testZ)) {
+    return testZ;
+  }
+
+  // Can't move, stay in place
+  return oldPos.clone();
+}
+
+/* =======================
    MOVEMENT
 ======================= */
 function move(dt) {
@@ -1154,7 +1241,21 @@ function move(dt) {
   velocity.z = direction.z * SPEED;
   velocity.y -= GRAVITY * dt;
 
-  player.position.addScaledVector(velocity, dt);
+  // Store old position
+  const oldPosition = player.position.clone();
+
+  // Calculate new position
+  const newPosition = oldPosition.clone();
+  newPosition.addScaledVector(velocity, dt);
+
+  // Check collision
+  if (checkCollision(newPosition)) {
+    // Try to resolve collision by sliding
+    newPosition.copy(resolveCollision(oldPosition, newPosition));
+  }
+
+  // Apply the validated position
+  player.position.copy(newPosition);
 
   // Ground collision
   if (player.position.y < 0) {
