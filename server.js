@@ -38,6 +38,9 @@ function normalizeAngle(angle) {
 }
 
 function cleanupPlayer(id) {
+  const player = players[id];
+  const team = player?.team;
+  
   // Clear any pending respawn timer
   if (respawnTimers[id]) {
     clearTimeout(respawnTimers[id]);
@@ -49,6 +52,14 @@ function cleanupPlayer(id) {
   
   // Broadcast player left
   broadcast({ type: "player_left", id });
+  
+  // Broadcast system message if player was on a team
+  if (team) {
+    broadcast({
+      type: "system",
+      message: `A player from ${team} team left the game`
+    });
+  }
   
   console.log(`❌ Player ${id} disconnected. ${Object.keys(players).length} players online.`);
 }
@@ -102,6 +113,13 @@ wss.on("connection", ws => {
       p.y = 0;
 
       console.log(`Player ${id} joined ${msg.team} team`);
+      
+      // Broadcast system message
+      broadcast({
+        type: "system",
+        message: `A player joined ${msg.team} team`
+      });
+      
       broadcast({ type: "player_joined", id, team: msg.team });
     }
 
@@ -229,6 +247,24 @@ wss.on("connection", ws => {
         type: "shoot",
         shooter: id,
         hit: hitSomeone
+      });
+    }
+    
+    // CHAT MESSAGE
+    if (msg.type === "chat") {
+      if (!p.team || !msg.message) return;
+      
+      // Sanitize message (basic)
+      const message = msg.message.substring(0, 100).trim();
+      if (!message) return;
+      
+      console.log(`💬 [${p.team}] Chat: ${message}`);
+      
+      // Broadcast to all players
+      broadcast({
+        type: "chat",
+        team: p.team,
+        message: message
       });
     }
   });
