@@ -52,6 +52,10 @@ const redBtn = document.getElementById("redBtn");
 const blueBtn = document.getElementById("blueBtn");
 const crosshair = document.getElementById("crosshair");
 const statusEl = document.getElementById("status");
+const chatBox = document.getElementById("chatBox");
+const chatMessages = document.getElementById("chatMessages");
+const chatInput = document.getElementById("chatInput");
+const chatSend = document.getElementById("chatSend");
 
 /* =======================
    TEAMS
@@ -640,6 +644,58 @@ function setupInput() {
 function setupUI() {
   redBtn.addEventListener("click", () => joinTeam("RED"));
   blueBtn.addEventListener("click", () => joinTeam("BLUE"));
+  
+  // Chat functionality
+  chatSend.addEventListener("click", sendChatMessage);
+  chatInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      sendChatMessage();
+    }
+  });
+  
+  // Don't capture game keys when typing in chat
+  chatInput.addEventListener("focus", () => {
+    Object.keys(keys).forEach(key => keys[key] = false);
+  });
+}
+
+function sendChatMessage() {
+  const message = chatInput.value.trim();
+  if (!message || !myTeam || !socketReady) return;
+  
+  safeSend({
+    type: "chat",
+    message: message,
+    team: myTeam
+  });
+  
+  chatInput.value = "";
+  chatInput.blur(); // Return focus to game
+}
+
+function addChatMessage(team, message, isSystem = false) {
+  const msgDiv = document.createElement("div");
+  msgDiv.className = "chat-message";
+  
+  if (isSystem) {
+    msgDiv.classList.add("system");
+    msgDiv.textContent = message;
+  } else {
+    msgDiv.classList.add(team.toLowerCase());
+    const teamBadge = document.createElement("span");
+    teamBadge.className = "team-badge";
+    teamBadge.textContent = team;
+    msgDiv.appendChild(teamBadge);
+    msgDiv.appendChild(document.createTextNode(message));
+  }
+  
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  
+  // Remove old messages (keep last 50)
+  while (chatMessages.children.length > 50) {
+    chatMessages.removeChild(chatMessages.firstChild);
+  }
 }
 
 function joinTeam(team) {
@@ -1074,6 +1130,9 @@ function setupSocket() {
     socketReady = true;
     statusEl.textContent = "Connected";
     statusEl.style.color = "lime";
+    
+    // Welcome message
+    addChatMessage("", "✅ Connected to server! Press Enter to chat.", true);
   };
 
   socket.onmessage = e => {
@@ -1157,6 +1216,14 @@ function setupSocket() {
 
     if (msg.type === "player_left") {
       cleanupRemotePlayer(msg.id);
+    }
+    
+    if (msg.type === "chat") {
+      addChatMessage(msg.team, msg.message);
+    }
+    
+    if (msg.type === "system") {
+      addChatMessage("", msg.message, true);
     }
   };
 
